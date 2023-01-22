@@ -1,0 +1,68 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code.
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*.
+
+```{r}
+BiocManager::install(c("GEOquery"))
+library("GEOquery")
+```
+
+```{r}
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("DESeq2")
+library(devtools)
+devtools::install_github("SydneyBioX/SimBench")
+library(SimBench)
+library(scDesign2)
+library(copula)    # corKendall
+library(Rtsne)
+library(plyr)      # mapvalues
+library(reshape2)  # melt
+library(gridExtra) # arrangeGrob
+library(ggpubr)    # as_ggplot
+library(cowplot)   # draw_plot_label
+library(ggplot2); theme_set(theme_bw());
+```
+
+```{r}
+path <- system.file("extdata", "real.rds", package="SimBench")
+simbench_real <- readRDS(path)
+unique_cell_type <- names(table(colnames(simbench_real)))
+set.seed(1)
+train_idx <- unlist(sapply(unique_cell_type, function(x){
+  cell_type_idx <- which(colnames(simbench_real) == x)
+  n_cell_total <- length(cell_type_idx)
+  sample(cell_type_idx, floor(n_cell_total/2))
+}))
+traincount <- simbench_real[, train_idx]
+testcount <- simbench_real[, -train_idx]
+```
+
+```{r}
+traincount
+```
+
+```{r}
+n_cell_new <- ncol(testcount[, colnames(testcount) == 'Tcea1'])
+
+# fit model and simulate data -----------------------------------------------------------
+set.seed(4)
+copula_result <- fit_model_scDesign2(traincount, 'Tcea1', sim_method = 'copula')
+sim_count_copula <- simulate_count_scDesign2(copula_result, n_cell_new, sim_method = 'copula')
+
+# save the model parameters and the simulated data --------------------------------------
+saveRDS(copula_result, file = 'scdesign2_outputs/simbench_copula_result_Stem_demo.rds')
+saveRDS(sim_count_copula, file = 'scdesign2_outputs/simbench_sim_count_copula_Stem_demo.rds')
+```
+
+```{r}
+df1 <- getGSEDataTables("GSE167050")
+df1
+```

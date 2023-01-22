@@ -1,0 +1,50 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+```{r}
+library(BiocManager)
+BiocManager::install("SPsimSeq")
+```
+
+
+```{r}
+data("zhang.data.sub.rda") 
+# filter genes with sufficient expression (important step) 
+zhang.counts <- zhang.data.sub$counts[rowSums(zhang.data.sub$counts > 0)>=5, ]  
+# We simulate only a single data (n.sim = 1) with the following property
+# - 2000 genes ( n.genes = 2000) 
+# - 20 samples (tot.samples = 20) 
+# - the samples are equally divided into 2 groups each with 90 samples 
+#   (group.config = c(0.5, 0.5))
+# - all samples are from a single batch (batch = NULL, batch.config = 1)
+# - we add 10% DE genes (pDE = 0.1) 
+# - the DE genes have a log-fold-change of at least 0.5 in 
+#   the source data (lfc.thrld = 0.5)
+# - we do not model the zeroes separately, they are the part of density 
+#    estimation (model.zero.prob = FALSE)
+# simulate data
+set.seed(6452)
+zhang.counts2 <- zhang.counts[sample(nrow(zhang.counts), 2000), ]
+sim.data.bulk <- SPsimSeq(n.sim = 1, s.data = zhang.counts2,
+                          group = zhang.data.sub$MYCN.status, n.genes = 2000, 
+                          batch.config = 1,
+                          group.config = c(0.5, 0.5), tot.samples = 20, 
+                          pDE = 0.1, lfc.thrld = 0.5, 
+                          result.format = "list")
+```
+
+```{r}
+
+
+```
+
+```{r}
+
+```
+

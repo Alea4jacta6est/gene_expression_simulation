@@ -1,0 +1,94 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# SimBu tutorial
+
+<http://omnideconv.org/SimBu/articles/simulator_documentation.html>
+
+```{r}
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("SimBu")
+```
+
+```{r}
+counts <- Matrix::Matrix(matrix(rpois(3e5, 5), ncol=300), sparse = TRUE)
+tpm <- Matrix::Matrix(matrix(rpois(3e5, 5), ncol=300), sparse = TRUE)
+tpm <- Matrix::t(1e6*Matrix::t(tpm)/Matrix::colSums(tpm))
+
+colnames(counts) <- paste0("cell_",rep(1:300))
+colnames(tpm) <- paste0("cell_",rep(1:300))
+rownames(counts) <- paste0("gene_",rep(1:1000))
+rownames(tpm) <- paste0("gene_",rep(1:1000))
+
+annotation_dataframe <- data.frame("ID"=paste0("cell_",rep(1:300)), 
+                         "cell_type"=c(rep("T cells CD4",50), 
+                                       rep("T cells CD8",50),
+                                       rep("Macrophages",100),
+                                       rep("NK cells",10),
+                                       rep("B cells",70),
+                                       rep("Monocytes",20)))
+```
+
+```{r}
+counts
+```
+
+```{r}
+annotation_dataframe
+```
+
+```{r}
+library(SimBu)
+# use local data to build dataset
+dataset <- dataset(annotation = annotation_dataframe, count_matrix = counts, name = "test_dataset")
+simulation <- simulate_bulk(data = dataset, scenario = "random", scaling_factor = "NONE")
+```
+
+```{r}
+simulation
+```
+
+## Creating SimBu format of the dataset
+
+```{r}
+ds <- SimBu::dataset(annotation = annotation_dataframe,
+                     count_matrix = counts,
+                     tpm_matrix = tpm,
+                     name = "test_dataset")
+```
+
+```{r}
+simulation <- SimBu::simulate_bulk(data = ds,
+                                   scenario = "random", 
+                                   scaling_factor = "NONE", 
+                                   ncells=100, 
+                                   nsamples = 10, 
+                                   BPPARAM = BiocParallel::MulticoreParam(workers = 4),  #this will use 4 threads to run the simulation
+                                   run_parallel = TRUE)  
+```
+
+SimBu can add mRNA bias by using different scaling factors to the simulations using the `scaling_factor` parameter. A detailed explanation can be found in the [\"Scaling factor\"](http://omnideconv.org/SimBu/articles/simulator_scaling_factors.Rmd) vignette.
+
+Currently there are 6 `scenarios` implemented in the package:
+
+-   *even*: this creates samples, where all existing cell-types in the dataset appear in the same proportions. So using a dataset with 3 cell-types, this will simulate samples, where all cell-type fractions are 1/3. In order to still have a slight variation
+    between cell type fractions, you can increase the `balance_uniform_mirror_scenario` parameter (default to 0.01). Setting it to 0 will generate simulations with exactly the same cell type fractions.
+
+-   *random*: this scenario will create random cell type fractions using all present types for each sample. The random sampling is based on the uniform distribution.
+
+-   *mirror_db*: this scenario will mirror the exact fractions of cell types which are present in the provided dataset. If it consists of 20% T cells, 30% B cells and 50% NK cells, all simulated samples
+    will mirror these fractions. Similar to the uniform scenario, you can add a small variation to these fractions with the `balance_uniform_mirror_scenario` parameter.
+
+-   *weighted*: here you need to set two additional parameters for the [`simulate_bulk()`](http://omnideconv.org/SimBu/reference/simulate_bulk.html) function: `weighted_cell_type` sets the cell-type you want to be over-representing and `weighted_amount` sets the fraction of this cell-type. You could for example use `B-cell` and `0.5` to create samples, where 50% are B-cells and the rest is filled randomly with other cell-types.
+
+-   *pure*: this creates simulations of only one single cell-type. You have to provide the name of this cell-type with the `pure_cell_type` parameter.
+
+-   *custom*: here you are able to create your own set of cell-type fractions. When using this scenario, you additionally need to provide a dataframe in the `custom_scenario_data` parameter, where each row represents one sample (therefore the number of rows need to match the `nsamples` parameter). Each column has to represent one cell-type, which also occurs in the dataset and describes the fraction of this cell-type in a sample. The fractions per sample need to sum up to 1. An example can be seen here:
+
+```{r}
+SimBu::plot_simulation(simulation = simulation)
+```

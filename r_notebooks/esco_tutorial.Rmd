@@ -1,0 +1,50 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# ESCO tutorial
+
+Mac fix for the error <https://stackoverflow.com/questions/66852721/problem-with-gfortran-unable-to-obtain-libquadmath-for-mac-big-sur>
+
+```{r}
+library("devtools")
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install("SC3")
+devtools::install_github("JINJINT/ESCO")
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+```{r}
+library(SC3)
+library(ESCO)
+
+#===== start simulation ======#
+sim <- escoSimulateSingle(nGenes = 100, nCells = 50, 
+                          withcorr = TRUE,
+                          verbose = FALSE)
+
+#===== access the data ======#
+datalist = list("simulated truth"=assays(sim)$TrueCounts,
+                "zero-inflated" = assays(sim)$counts, 
+                "down-sampled" = assays(sim)$observedcounts)
+
+#====== plot the data ======#
+heatdata(datalist, norm = FALSE, size = 2, ncol = 3)
+
+#====== plot the Gene correlation ======#
+# object that saved all simulation configurations
+simparams = metadata(sim)$Params 
+
+# object that particularly saved the correlation structure
+rholist = slot(simparams,"corr") 
+
+# arrange the true correlation and simulated correlation
+corrgenes = rownames(rholist[[1]])
+gcnlist = lapply(datalist, function(data)gcn(data, genes = corrgenes))
+gcnlist = append(gcnlist, list("given truth" = rholist[[1]]), 0)
+heatgcn(gcnlist, size = 3, ncol = 4)
+```
